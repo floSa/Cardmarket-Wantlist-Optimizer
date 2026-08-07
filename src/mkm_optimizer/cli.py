@@ -120,6 +120,7 @@ def optimize(
         min_condition=filt.get("min_condition"),
         languages=filt.get("languages"),
         foil=filt.get("foil"),
+        max_offer_price=filt.get("max_offer_price"),
     )
     console.print(
         f"  Après filtres globaux : {len(offers)} offres "

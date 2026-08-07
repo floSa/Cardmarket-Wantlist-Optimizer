@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Iterable
 
-from playwright.sync_api import (
+from patchright.sync_api import (
     BrowserContext,
     Error as PWError,
     Page,
@@ -215,11 +215,50 @@ def fetch_seller(
         stats.duration_seconds = round(time.monotonic() - started, 2)
 
 
+_CF_CHALLENGE_MARKERS = (
+    "just a moment",
+    "un instant",              # défi Cloudflare en français
+    "veuillez patienter",
+    "vérification",
+    "attention required",
+    "cf-browser-verification",
+    "checking your browser",
+    "verifying you are human",
+)
+
+
+def _is_cf_challenge(page: Page) -> bool:
+    """Vrai si la page affichée est un interstitiel Cloudflare (pas le vrai contenu)."""
+    try:
+        title = (page.title() or "").lower()
+    except Exception:
+        return False
+    return any(m in title for m in _CF_CHALLENGE_MARKERS)
+
+
+def _wait_challenge_cleared(page: Page, timeout_s: int = 18) -> bool:
+    """
+    Le défi JS Cloudflare (« Just a moment… ») s'auto-résout et redirige vers le
+    contenu réel en quelques secondes. On patiente jusqu'à `timeout_s` que le
+    titre ne soit plus celui d'un interstitiel. Retourne True si résolu.
+    """
+    end = time.monotonic() + timeout_s
+    while time.monotonic() < end:
+        time.sleep(2)
+        if not _is_cf_challenge(page):
+            try:
+                page.wait_for_load_state("domcontentloaded", timeout=5000)
+            except Exception:
+                pass
+            return True
+    return not _is_cf_challenge(page)
+
+
 def _goto_with_backoff(page: Page, url: str, opts: FetchOptions) -> Response | None:
     """
     Navigue vers `url` en gérant timeout, erreurs réseau (ERR_NETWORK_CHANGED,
-    ERR_INTERNET_DISCONNECTED…) et HTTP 429/503 par backoff exponentiel.
-    Retourne la Response (ou None si tous les essais ont échoué).
+    ERR_INTERNET_DISCONNECTED…), HTTP 429/503 et les défis Cloudflare par
+    backoff exponentiel. Retourne la Response (ou None si tous les essais ont échoué).
     """
     delay = opts.on_429_initial_backoff
     for attempt in range(1, opts.on_429_max_attempts + 1):
@@ -242,6 +281,21 @@ def _goto_with_backoff(page: Page, url: str, opts: FetchOptions) -> Response | N
         if response is None:
             return None
         status = response.status
+
+        # Défi Cloudflare (« Just a moment… » / « Attention Required »), souvent
+        # servi en 403 : on laisse le JS du défi se résoudre (auto-redirection)
+        # avant d'abandonner. Si résolu, le vrai contenu est dans page.content().
+        if status == 403 or _is_cf_challenge(page):
+            if _wait_challenge_cleared(page):
+                return response
+            log.warning(
+                "défi Cloudflare non résolu — backoff %.0fs (tentative %d/%d)",
+                delay, attempt, opts.on_429_max_attempts,
+            )
+            time.sleep(delay)
+            delay *= 2
+            continue
+
         if status == 200:
             return response
         if status == 429 or status == 503:
@@ -255,7 +309,7 @@ def _goto_with_backoff(page: Page, url: str, opts: FetchOptions) -> Response | N
         # Autres statuts (404, 500…) : on remonte tel quel
         log.error("HTTP %d sur %s", status, url)
         return response
-    log.error("Toutes les tentatives ont échoué (timeout/réseau/429) pour %s", url)
+    log.error("Toutes les tentatives ont échoué (timeout/réseau/429/défi CF) pour %s", url)
     return None
 
 
@@ -305,7 +359,7 @@ def fetch_all_sellers(
                 if stats.error == "auth_expired":
                     log.error("Session expirée en cours de scraping — abandon.")
                     break
-                # Pause entre vendeurs (un peu plus longue)
+                # Pause entre vendeurs
                 if i < len(sellers):
                     time.sleep(random.uniform(1.0, 2.0))
         finally:

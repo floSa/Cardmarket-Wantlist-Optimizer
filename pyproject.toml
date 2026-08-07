@@ -4,10 +4,10 @@ version = "0.1.0"
 description = "Optimiseur d'achats Cardmarket — minimise coût total (cartes + FDP) en limitant le nombre de vendeurs."
 requires-python = ">=3.11"
 dependencies = [
-    "selectolax>=0.3.21",   # parsing HTML rapide (10x BeautifulSoup) pour les pages MKM (10-20 Mo)
+    "selectolax>=0.4.11",   # parsing HTML rapide (10x BeautifulSoup) pour les pages MKM (10-20 Mo)
     "pulp>=2.8",            # solveur MIP avec CBC embarqué
     "pydantic>=2.6",        # modèles de données typés
-    "pyyaml>=6.0",          # config + shipping_overrides
+    "pyyaml>=6.0.3",        # config + shipping_overrides
     "rich>=13.0",           # CLI / logs lisibles
     "typer>=0.12",          # CLI ergonomique
     "python-dotenv>=1.0",   # chargement .env (credentials locaux gitignored)
@@ -15,7 +15,11 @@ dependencies = [
 
 [project.optional-dependencies]
 scrape = [
-    "playwright>=1.42",     # Option B (étape suivante) : récupération HTML auto
+    # patchright = remplaçant drop-in de Playwright qui patche la fuite CDP
+    # `Runtime.enable` que Cloudflare détecte depuis mi-2026. Indispensable
+    # pour que le fetch passe (voir README § fetch). Tire Playwright en dépendance.
+    "patchright>=1.52",
+    "playwright>=1.42",
 ]
 dev = [
     "pytest>=8.0",

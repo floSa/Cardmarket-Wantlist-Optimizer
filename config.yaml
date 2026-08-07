@@ -29,13 +29,19 @@ filters:
   # Foil : true (foil obligatoire) | false (non-foil obligatoire) | any
   foil: any
 
+  # Plafond de prix unitaire (€) : toute offre au-dessus est écartée avant le
+  # solveur. Évite que des listings « poubelle » à prix aberrant (ex. une
+  # commune affichée à 1000 €) polluent les scénarios à vendeurs limités.
+  # null = pas de plafond.
+  max_offer_price: 20
+
 # Frais de port — barème UNIQUE pour tous les vendeurs (palier par nb cartes).
 # Si un palier ne s'applique pas, le solveur écarte simplement le vendeur.
 shipping:
   brackets:
-    - { max_cards: 20, cost: 3.60 }
-    - { max_cards: 50, cost: 6.00 }
-    - { max_cards: 100, cost: 8.00 }
+    - { max_cards: 40,  cost: 4.10 }   # lettre suivie
+    - { max_cards: 100, cost: 6.50 }
+    - { max_cards: 500, cost: 8.60 }   # 101 cartes et +
 
 # Optimisation
 optimization:

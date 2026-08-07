@@ -17,6 +17,8 @@ Seuls les filtres TRULY globaux (insensibles au want) sont appliqués ici :
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from .models import Offer
 
 
@@ -26,14 +28,28 @@ def filter_offers(
     min_condition: str | None = None,    # ignoré, conservé pour compat de signature
     languages: list[str] | None = None,  # ignoré, idem
     foil: str | None = None,             # ignoré, idem
+    max_offer_price: Decimal | float | str | None = None,
 ) -> list[Offer]:
     """
-    Pré-filtre global. Aujourd'hui ne filtre que les `excluded_sellers`.
-    Les autres params sont conservés dans la signature pour ne pas casser le
-    CLI et `config.yaml` existants, mais ils sont volontairement ignorés (le
-    matching fin est fait par compat.is_compatible).
+    Pré-filtre global. Filtre :
+      - `excluded_sellers` : pseudos avec qui on refuse de traiter
+      - `max_offer_price`  : écarte toute offre dont le prix unitaire dépasse
+        ce plafond (en €). Sert à exclure les listings « poubelle » à prix
+        aberrant (ex. une commune affichée à 1000 €) qui, sous contrainte de
+        vendeurs, polluent la solution. None = pas de plafond.
+
+    Les params min_condition/languages/foil sont conservés dans la signature
+    pour ne pas casser le CLI et `config.yaml` existants, mais ils sont
+    volontairement ignorés (le matching fin est fait par compat.is_compatible).
     """
     excluded = {s.lower() for s in (excluded_sellers or [])}
-    if not excluded:
-        return list(offers)
-    return [o for o in offers if o.seller.lower() not in excluded]
+    cap = Decimal(str(max_offer_price)) if max_offer_price is not None else None
+
+    def keep(o: Offer) -> bool:
+        if o.seller.lower() in excluded:
+            return False
+        if cap is not None and o.price > cap:
+            return False
+        return True
+
+    return [o for o in offers if keep(o)]

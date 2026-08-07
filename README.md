@@ -68,12 +68,23 @@ Aucune utilisation de l'API officielle MKM (réservée aux vendeurs pros).
 # 1. Clone / cd dans le projet
 cd /home/florian/mes_projets/cardmarket-wantlist-optimizer
 
-# 2. Crée l'environnement + installe les deps (gérées par uv via pyproject.toml + uv.lock)
-uv sync
+# 2. Crée l'environnement + installe les deps, y compris l'extra `scrape`
+#    (patchright + playwright), gérées par uv via pyproject.toml + uv.lock
+uv sync --extra scrape
 
-# 3. Télécharge Chromium pour Playwright
-uv run playwright install --with-deps chromium
+# 3. Télécharge le Chromium patché de patchright
+uv run patchright install chromium
+
+# 4. (WSL) écran virtuel Xvfb — le fetch tourne en mode "fenêtre" (headed)
+#    pour ne pas être détecté par Cloudflare (voir § fetch).
+sudo apt-get install -y xvfb        # une seule fois
 ```
+
+> **Pourquoi patchright + Xvfb ?** Depuis mi-2026, Cloudflare détecte
+> Playwright via la fuite CDP `Runtime.enable` **et** le mode headless.
+> `patchright` (drop-in de Playwright) patche le leak ; le mode headed sous
+> écran virtuel `Xvfb` évite la détection headless. Sans ça, le fetch reçoit
+> des pages « Un instant… » / « Attention Required » de Cloudflare.
 
 ## Configuration
 
@@ -93,15 +104,16 @@ ne transitent par aucun fichier sauvegardé après login.
 ```yaml
 filters:
   excluded_sellers: []      # pseudos avec qui on refuse de traiter
+  max_offer_price: 20       # plafond de prix unitaire (€) ; null = pas de plafond
   # min_condition / languages / foil / seller_country : conservés pour
   # référence mais NON appliqués globalement — chaque want porte ses propres
   # filtres parsés depuis ta wantlist MKM.
 
 shipping:
-  brackets:                  # paliers FDP (FR par défaut, suivi obligatoire)
-    - { max_cards: 20,  cost: 3.60 }
-    - { max_cards: 50,  cost: 6.00 }
-    - { max_cards: 100, cost: 8.00 }
+  brackets:                  # paliers FDP par vendeur, selon le nb de cartes
+    - { max_cards: 40,  cost: 4.10 }   # 1–40 cartes : lettre suivie
+    - { max_cards: 100, cost: 6.50 }   # 41–100 cartes
+    - { max_cards: 500, cost: 8.60 }   # 101 cartes et +
 
 optimization:
   scenarios:                # un panier optimisé est produit pour chaque
@@ -126,11 +138,14 @@ sellers:
 ## Quick Start
 
 ```bash
-# 1. Connexion MKM (1 seule fois, valide ~30 jours)
-uv run mkm-optim login
+# 0. (WSL) démarre l'écran virtuel si pas déjà lancé
+Xvfb :99 -screen 0 1440x900x24 &
 
-# 2. Scrape les vendeurs (--refresh si ta wantlist a changé)
-uv run mkm-optim fetch --refresh
+# 1. Session MKM : voir § "Authentification" (cookie importé — le login auto
+#    est bloqué par Cloudflare). Session dans .auth/storage_state.json.
+
+# 2. Scrape les vendeurs (patchright + headed sous Xvfb via DISPLAY=:99)
+DISPLAY=:99 uv run mkm-optim fetch --refresh
 
 # 3. Génère le rapport d'optimisation
 uv run mkm-optim optimize \
@@ -161,28 +176,39 @@ uv run mkm-optim check-cart \
 
 ## Commandes
 
-### `login` — connexion à Cardmarket
+### Authentification — session Cardmarket
 
-```bash
-uv run mkm-optim login
-```
+Depuis mi-2026, **Cloudflare bloque la soumission automatisée du formulaire de
+login** (`mkm-optim login` reçoit « Attention Required »). La méthode fiable
+est d'**importer le cookie de session de ton propre navigateur** (où tu passes
+Cloudflare en tant qu'humain) :
 
-Ouvre Chromium (headed via WSLg sur Windows 11). Si `.env` est rempli, les
-champs sont pré-remplis et soumis automatiquement. Sinon, mode interactif.
-La session est sauvegardée dans `.auth/storage_state.json` (gitignored,
-valide ~30 jours).
+1. Connecte-toi sur cardmarket.com dans ton navigateur (Firefox/Chrome).
+2. Avec l'extension **Cookie-Editor**, exporte les cookies du domaine en JSON
+   et colle-les dans `.auth/cookies_export.json` (gitignored).
+3. Convertis-les en session : on ne garde que les cookies d'authentification
+   (`PHPSESSID`, `idUser`, `cookie_settings`, `i18n_redirected` forcé à `fr`),
+   **pas** les cookies Cloudflare (`cf_clearance`, `__cf_bm`, `_cfuvid`) qui
+   sont liés à l'UA de ton navigateur — patchright regénère les siens. Le
+   résultat s'écrit dans `.auth/storage_state.json`.
+
+> `mkm-optim login` (Chromium headed) reste dans le code pour le jour où
+> Cloudflare relâchera, mais n'est pas fiable actuellement.
 
 ### `fetch` — récupération des offres vendeurs
 
+Le fetch tourne avec **patchright en mode headed sous Xvfb** — préfixe donc
+toujours par `DISPLAY=:99` (et lance `Xvfb :99 ... &` au préalable).
+
 ```bash
 # Scrape tous les vendeurs de data/vendeurs_liste/vendeurs.yaml (skippe ceux déjà en cache)
-uv run mkm-optim fetch
+DISPLAY=:99 uv run mkm-optim fetch
 
 # Force le re-scrape (utile si la wantlist a changé)
-uv run mkm-optim fetch --refresh
+DISPLAY=:99 uv run mkm-optim fetch --refresh
 
 # Tester sur un seul vendeur (ex : debug)
-uv run mkm-optim fetch --only CORP-F --refresh
+DISPLAY=:99 uv run mkm-optim fetch --only CORP-F --refresh
 ```
 
 Chaque page d'offres est sauvegardée dans `data/sellers/<pseudo>/page<N>.html`.
@@ -286,14 +312,15 @@ src/mkm_optimizer/
 ├── config.py             # Chargement config.yaml + config.local.yaml
 ├── models.py             # Dataclasses : WantEntry, Offer, Solution, etc.
 ├── selectors.py          # TOUS les sélecteurs CSS / tables FR↔EN centralisés
-├── filters.py            # Pré-filtres globaux (excluded_sellers uniquement)
+├── filters.py            # Pré-filtres globaux (excluded_sellers, max_offer_price)
 ├── reporter.py           # Génération MD + CSV des rapports
 ├── wantlist_export.py    # Export CSV de la wantlist (audit)
 ├── parser/
 │   ├── wantlist.py       # Parse page /Wants/<id> → list[WantEntry]
 │   └── seller_offers.py  # Parse pages /Users/<v>/Offers + pagination
 ├── scraper/              # Playwright : login + fetch paginé
-│   ├── auth.py
+│   ├── auth.py           # Soumission du login, fallback ENTRÉE si le clic
+│   │                     # sur le bouton submit est intercepté (bannière cookies)
 │   └── fetch.py
 └── optimizer/
     ├── compat.py         # is_compatible(offer, want)
@@ -317,6 +344,14 @@ Soit la session MKM est OK et c'est juste un faux warning (vérifie avec un
 fetch test), soit Cloudflare a affiché un CAPTCHA que tu n'as pas résolu.
 Relance `mkm-optim login` et termine bien la connexion dans la fenêtre
 Chromium avant d'appuyer Entrée dans le terminal.
+
+### Le login se bloque sur le clic du bouton submit
+
+Si la bannière cookies (Cybot) recouvre encore le bouton au moment du login
+automatique, le clic échoue par timeout. Dans ce cas, `login` bascule
+automatiquement sur un appui ENTRÉE dans le champ mot de passe, qui soumet le
+formulaire sans dépendre de la position du bouton. Si ça échoue aussi, le
+mode interactif prend le relais.
 
 ### `RuntimeError: Session expirée ou invalide`
 

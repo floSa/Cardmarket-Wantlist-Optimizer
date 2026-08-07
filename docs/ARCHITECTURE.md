@@ -28,7 +28,7 @@ Tout le code vit sous [src/mkm_optimizer/](../src/mkm_optimizer).
 | [config.py](../src/mkm_optimizer/config.py) | Chargement `config.yaml` + surcharge récursive par `config.local.yaml` (gitignored). |
 | [models.py](../src/mkm_optimizer/models.py) | Dataclasses typées (`WantEntry`, `Offer`, `Seller`, `ShippingBracket`, `Assignment`, `VendorBasket`, `Solution`) et enums `Condition` / `Foil`. Prix en `Decimal`. |
 | [selectors.py](../src/mkm_optimizer/selectors.py) | Sélecteurs CSS et tables de correspondance FR↔EN, centralisés. |
-| [filters.py](../src/mkm_optimizer/filters.py) | Pré-filtre global des offres. N'applique aujourd'hui que `excluded_sellers`. |
+| [filters.py](../src/mkm_optimizer/filters.py) | Pré-filtre global des offres : `excluded_sellers` et `max_offer_price`. |
 | [overrides.py](../src/mkm_optimizer/overrides.py) | Applique `wantlist_overrides.yaml` (corrections locales de la wantlist). |
 | [reporter.py](../src/mkm_optimizer/reporter.py) | Génération des rapports Markdown + CSV d'optimisation. |
 | [wantlist_export.py](../src/mkm_optimizer/wantlist_export.py) | Export CSV brut d'une wantlist (audit). |
@@ -164,7 +164,8 @@ merge récursif dans [config.py](../src/mkm_optimizer/config.py)).
 | Clé | Rôle |
 |---|---|
 | `wantlist.default_id` | ID de la wantlist MKM par défaut. |
-| `filters.excluded_sellers` | Pseudos toujours ignorés (seul filtre global effectif). |
+| `filters.excluded_sellers` | Pseudos toujours ignorés. |
+| `filters.max_offer_price` | Plafond de prix unitaire (€) : écarte les offres au-dessus avant le solveur, pour éviter que des listings « poubelle » à prix aberrant polluent les scénarios à vendeurs limités. `null` = pas de plafond. |
 | `filters.min_condition` / `languages` / `foil` / `seller_country` / `seller_type` / `min_reputation` | Conservés pour référence mais **non appliqués globalement** (voir §Décisions). |
 | `shipping.brackets` | Paliers de FDP (`max_cards` / `cost`), barème unique tous vendeurs. |
 | `optimization.scenarios` | Liste des scénarios générés (`name`, `max_vendors`, `vendor_fixed_cost`). |
