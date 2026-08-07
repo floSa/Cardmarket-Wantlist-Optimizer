@@ -14,6 +14,7 @@ config.local.yaml
 # Les .gitkeep dans chaque sous-dossier data/ sont trackés pour conserver la structure.
 # data/vendeurs_liste/vendeurs.yaml est intentionnellement tracké (pas ignoré).
 data/wantlists/**/*.html
+!data/wantlists/wantlists.html
 data/sellers/**/*.html
 data/panier/**/*.html
 data/discovery/**/*.html

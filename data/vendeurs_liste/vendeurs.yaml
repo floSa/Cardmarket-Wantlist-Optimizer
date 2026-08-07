@@ -5,7 +5,7 @@
 # Reconstitué depuis data/sellers/ après la disparition accidentelle du
 # fichier — les 37 vendeurs ci-dessous ont tous des HTMLs déjà scrapés.
 
-wantlist_id: 23837361
+wantlist_id: 24265843
 
 sellers:
   - AbsolutMintCard
@@ -61,4 +61,3 @@ sellers:
   - Table1MTG
   - TCG-Detsuny
   - yardbirds
-  - 
