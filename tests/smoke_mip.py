@@ -31,8 +31,8 @@ from mkm_optimizer.parser.seller_offers import parse_seller_offers
 from mkm_optimizer.parser.wantlist import parse_wantlist
 
 
-WANT_HTML = Path("/tmp/want_list.html")
-SELLER_HTML = Path("/tmp/wantlist_cartes.html")
+WANT_HTML = Path(__file__).parent.parent / "data" / "wantlists" / "wantlists.html"
+SELLER_HTML = Path(__file__).parent.parent / "data" / "sellers" / "CORP-F" / "page1.html"
 
 BRACKETS = [
     ShippingBracket(max_cards=20,  cost=Decimal("3.60")),
@@ -128,33 +128,33 @@ def test_synthetic_split() -> None:
     offers = [
         # A
         Offer(seller="A", card_name="Lightning Bolt", product_url="…",
-              set_label="Beta", condition=Condition.NM, language="en",
+              set_label="Beta", set_code=None, condition=Condition.NM, language="en",
               foil=Foil.NO, is_signed=False, is_altered=False,
               price=Decimal("0.10"), quantity_available=1),
         Offer(seller="A", card_name="Sol Ring",       product_url="…",
-              set_label="Beta", condition=Condition.NM, language="en",
+              set_label="Beta", set_code=None, condition=Condition.NM, language="en",
               foil=Foil.NO, is_signed=False, is_altered=False,
               price=Decimal("1.30"), quantity_available=1),
         Offer(seller="A", card_name="Black Lotus",    product_url="…",
-              set_label="Beta", condition=Condition.GD, language="en",
+              set_label="Beta", set_code=None, condition=Condition.GD, language="en",
               foil=Foil.NO, is_signed=False, is_altered=False,
               price=Decimal("5.00"), quantity_available=1),
         # B
         Offer(seller="B", card_name="Lightning Bolt", product_url="…",
-              set_label="Magic 2011", condition=Condition.NM, language="en",
+              set_label="Magic 2011", set_code=None, condition=Condition.NM, language="en",
               foil=Foil.NO, is_signed=False, is_altered=False,
               price=Decimal("0.50"), quantity_available=5),
         Offer(seller="B", card_name="Sol Ring",       product_url="…",
-              set_label="Commander 2021", condition=Condition.NM, language="en",
+              set_label="Commander 2021", set_code=None, condition=Condition.NM, language="en",
               foil=Foil.NO, is_signed=False, is_altered=False,
               price=Decimal("1.00"), quantity_available=2),
         # C
         Offer(seller="C", card_name="Lightning Bolt", product_url="…",
-              set_label="Magic 2010", condition=Condition.NM, language="en",
+              set_label="Magic 2010", set_code=None, condition=Condition.NM, language="en",
               foil=Foil.NO, is_signed=False, is_altered=False,
               price=Decimal("0.55"), quantity_available=4),
         Offer(seller="C", card_name="Sol Ring",       product_url="…",
-              set_label="Revised", condition=Condition.NM, language="en",
+              set_label="Revised", set_code=None, condition=Condition.NM, language="en",
               foil=Foil.NO, is_signed=False, is_altered=False,
               price=Decimal("1.10"), quantity_available=1),
     ]

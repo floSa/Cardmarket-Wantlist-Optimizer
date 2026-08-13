@@ -1,5 +1,5 @@
 """
-Smoke test : applique les 2 parsers aux HTMLs réels présents dans /tmp/.
+Smoke test : applique les 2 parsers aux HTMLs réels présents dans data/.
 Pas un test pytest — un script de validation rapide pour le développement.
 
 Lancer :
@@ -19,8 +19,8 @@ from mkm_optimizer.parser.wantlist import parse_wantlist, parse_wantlist_meta
 from mkm_optimizer.parser.seller_offers import parse_seller_offers
 
 
-WANT_HTML = Path("/tmp/want_list.html")
-SELLER_HTML = Path("/tmp/wantlist_cartes.html")  # page CORP-F filtrée par wantlist
+WANT_HTML = Path(__file__).parent.parent / "data" / "wantlists" / "wantlists.html"
+SELLER_HTML = Path(__file__).parent.parent / "data" / "sellers" / "CORP-F" / "page1.html"  # page CORP-F filtrée par wantlist
 
 
 def banner(s: str) -> None:
