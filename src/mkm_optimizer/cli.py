@@ -18,7 +18,7 @@ from rich.console import Console
 from rich.table import Table
 
 from .config import load_config
-from .filters import filter_offers
+from .filters import drop_price_outliers, filter_offers
 from .models import Offer, Solution, WantEntry
 from .optimizer.mip import brackets_from_config, solve
 from .parser import parse_seller_offers, parse_seller_offers_dir, parse_wantlist
@@ -76,6 +76,16 @@ def optimize(
     # Overrides locaux (wantlist_overrides.yaml à la racine du projet)
     overrides_path = Path("wantlist_overrides.yaml")
     wants = apply_wantlist_overrides(wants, overrides_path)
+    # `filters.foil: any` neutralise la contrainte foil de TOUS les wants : on
+    # cherche le prix le plus bas, foil ou non. La clé est portée par le want
+    # (et non par l'offre), d'où la réécriture ici.
+    if str(filt.get("foil", "")).lower() == "any":
+        import dataclasses
+
+        from .models import Foil
+
+        wants = [dataclasses.replace(w, foil=Foil.ANY) for w in wants]
+        console.print("  [dim]foil: any — la contrainte foil des wants est ignorée[/dim]")
     console.print(
         f"  {len(wants)} wants / {sum(w.quantity for w in wants)} cartes"
         f" — titre : {title!r}"
@@ -127,6 +137,26 @@ def optimize(
         f"  Après filtres globaux : {len(offers)} offres "
         f"({len(raw_offers) - len(offers)} écartées)"
     )
+
+    # --- Prix aberrants : coupe les offres très au-dessus du marché, que le
+    #     solveur retiendrait sinon pour économiser un port.
+    offers, aberrantes = drop_price_outliers(
+        offers,
+        filt.get("max_price_ratio"),
+        floor=filt.get("max_price_floor", "1.50"),
+    )
+    if aberrantes:
+        console.print(
+            f"  Prix aberrants écartés : {len(aberrantes)} offres "
+            f"(≥ {filt.get('max_price_floor', 1.50)} € ET > "
+            f"{filt['max_price_ratio']}× le prix mini de la carte)"
+        )
+        if verbose:
+            for o, mini in sorted(aberrantes, key=lambda x: -(x[0].price / x[1]))[:15]:
+                console.print(
+                    f"      {o.card_name} — {o.price} € chez {o.seller} "
+                    f"(mini {mini} €, ×{o.price / mini:.1f})"
+                )
 
     # --- Optimisation par scénario
     from decimal import Decimal

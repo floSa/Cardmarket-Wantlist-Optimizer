@@ -53,3 +53,52 @@ def filter_offers(
         return True
 
     return [o for o in offers if keep(o)]
+
+
+def drop_price_outliers(
+    offers: list[Offer],
+    ratio: Decimal | float | str | None,
+    floor: Decimal | float | str = "1.50",
+) -> tuple[list[Offer], list[tuple[Offer, Decimal]]]:
+    """
+    Écarte les offres à prix aberrant : celles qui coûtent à la fois PLUS de
+    `floor` euros ET plus de `ratio` fois le prix le plus bas constaté pour la
+    MÊME carte, tous vendeurs confondus.
+
+    Motivation : le solveur retient parfois une offre très au-dessus du marché
+    parce que le vendeur est déjà dans le panier (le port est déjà payé). C'est
+    arithmétiquement juste — 4,00 € chez un vendeur ouvert battent 0,99 € + 4,10 €
+    de port — mais inacceptable en pratique.
+
+    Les DEUX conditions sont nécessaires. Le ratio seul écarterait une commune
+    passant de 0,02 € à 0,10 € (×5 mais 8 centimes d'écart, sans importance) ;
+    le plancher seul écarterait des cartes chères mais correctement tarifées.
+    Ensemble, ils ne visent que ce qui fait mal : une carte à plus de 1,50 €
+    payée au double de sa valeur.
+
+    Le repère est le MINIMUM et non la médiane : c'est ainsi qu'on juge
+    spontanément qu'un prix est aberrant (« ça vaut 1 €, il la vend 4 € »).
+
+    Retourne (offres_gardées, [(offre_écartée, prix_mini_de_la_carte), …]).
+    """
+    if ratio is None:
+        return list(offers), []
+
+    r = Decimal(str(ratio))
+    f = Decimal(str(floor))
+
+    mini: dict[str, Decimal] = {}
+    for o in offers:
+        k = o.card_key
+        if k not in mini or o.price < mini[k]:
+            mini[k] = o.price
+
+    gardees: list[Offer] = []
+    ecartees: list[tuple[Offer, Decimal]] = []
+    for o in offers:
+        m = mini[o.card_key]
+        if o.price >= f and o.price > m * r:
+            ecartees.append((o, m))
+        else:
+            gardees.append(o)
+    return gardees, ecartees
