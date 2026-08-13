@@ -3,7 +3,7 @@
 
 wantlist:
   # ID de la wantlist MKM par défaut (visible dans l'URL /Wants/<id>)
-  default_id: 23837361
+  default_id: 24265843
 
 # Filtres sur les offres considérées
 filters:

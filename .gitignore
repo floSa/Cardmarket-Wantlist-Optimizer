@@ -18,6 +18,9 @@ data/wantlists/**/*.html
 data/sellers/**/*.html
 data/panier/**/*.html
 data/discovery/**/*.html
+# Snapshots horodatés de data/sellers, pris avant un re-fetch pour pouvoir
+# diffuser deux scrapes (voir investigation du 2026-08-13).
+data/_snapshots/
 reports/*.md
 reports/*.csv
 
