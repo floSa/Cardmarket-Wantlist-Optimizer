@@ -17,8 +17,12 @@ filters:
   # Note minimale du vendeur sur 5
   min_reputation: 4.0
 
-  # Pseudos vendeurs à toujours ignorer (problèmes passés, etc.)
-  excluded_sellers: []
+  # Pseudos vendeurs à toujours ignorer (problèmes passés, vacances, etc.)
+  # Playin : en congés au 2026-08-13, commandes impossibles. À retirer d'ici
+  # à sa réouverture.
+  excluded_sellers:
+    - Playin
+    - EUREKA-FR
 
   # État minimum accepté (MT > NM > EX > GD > LP > PL > PO)
   min_condition: EX
@@ -27,7 +31,21 @@ filters:
   languages: [fr, en]
 
   # Foil : true (foil obligatoire) | false (non-foil obligatoire) | any
+  # `any` neutralise la contrainte foil de tous les wants : on veut le prix le
+  # plus bas, foil ou pas.
   foil: any
+
+  # Prix aberrant. Une offre est écartée si les DEUX conditions sont réunies :
+  #   - son prix unitaire atteint `max_price_floor` euros, ET
+  #   - il dépasse `max_price_ratio` fois le prix le plus bas trouvé pour la
+  #     même carte, tous vendeurs confondus.
+  # Sans ça, le solveur retient une carte à 4,00 € chez un vendeur déjà ouvert
+  # alors qu'elle vaut 0,99 € ailleurs, juste pour économiser un port.
+  # Les deux conditions évitent de sanctionner les centimes : passer de 0,25 €
+  # à 0,75 € n'a aucune importance, payer 4,00 € une carte à 1,00 € en a.
+  # max_price_ratio: null = pas de garde-fou.
+  max_price_ratio: 2
+  max_price_floor: 1.50
 
   # Plafond de prix unitaire (€) : toute offre au-dessus est écartée avant le
   # solveur. Évite que des listings « poubelle » à prix aberrant (ex. une

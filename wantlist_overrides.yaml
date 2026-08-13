@@ -21,3 +21,17 @@
 overrides:
   - card: "Éthérien doué"
     max_price: 0.75
+
+  # Ces 3 wants ont été saisis sur MKM sans critère de langue : le solveur
+  # partait donc chercher l'italien, moins cher. On force fr/en ici.
+  - card: "Reboisement des régions reculées"
+    languages: [fr, en]
+  - card: "Collet à sorts"
+    languages: [fr, en]
+  - card: "Messe noire"
+    languages: [fr, en]
+
+  # Abandonnée (2026-08-13). À retirer d'ici si elle est supprimée de la
+  # wantlist MKM, sinon l'override la masquerait inutilement.
+  - card: "Eclipsed Steppe"
+    quantity: 0
