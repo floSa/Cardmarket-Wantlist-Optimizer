@@ -14,7 +14,6 @@ wantlist_id: 24265843
 sellers:
   - AbsolutMintCard
   - Antredujeu
-  # - ArcheAJeux
   - ARK-Games
   - BattleMindTavern
   - BazaarOfKoji
@@ -29,15 +28,13 @@ sellers:
   - CartesManiac
   - CORP-F
   - cromwel
+  - D-Insane
   - Dooz-TCG
-  # - DracauGames
   - Eclypse
-  # - edwyn-le-muet
   - Eldar-Caen
   - EUREKA-FR
   - FantasySphere
   - FMR-cards
-  # - fredc
   - Garr0n
   - Greg59
   - HDC-Trade
@@ -49,19 +46,16 @@ sellers:
   - Kavoldox
   - La-Guilde-Du-Jeu
   - LaBelleCarte
-  # - Laurent38
   - Le-royaume-de-Serra
   - ledouble6
   - Lesjeuxdemerlin
   - LeVizz
   - LGRMasterC
   - Lud52
-  # - Ludetopia
   - LudoB
   - MaelstromCG
   - MagicAtHome
   - MagicBougnat
-  # - Magicboxx
   - MagicNice
   - MagicoSphere
   - maglaf88
@@ -69,7 +63,6 @@ sellers:
   - mattsagace
   - meeples-et-cartes
   - MerfolkTraders
-  # - MrJoShop
   - MTGSPOT-FR
   - Mystic-Ambre
   - OJT50
@@ -78,8 +71,6 @@ sellers:
   - Parence-com
   - Parkage
   - Philogelos
-  # - PlaceOfGeek
-  # - play-mtg-fr
   - Playin
   - plkfd
   - Pyxidice
@@ -97,7 +88,17 @@ sellers:
   - TCG-Detsuny
   - TorinoMTG
   - Varzog
-  # - WoodMousePatronus
   - Woops
   - yannzup
   - yardbirds
+  # - ArcheAJeux
+  # - DracauGames
+  # - edwyn-le-muet
+  # - fredc
+  # - Laurent38
+  # - Ludetopia
+  # - Magicboxx
+  # - MrJoShop
+  # - PlaceOfGeek
+  # - play-mtg-fr
+  # - WoodMousePatronus
