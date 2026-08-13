@@ -7,72 +7,97 @@
 
 wantlist_id: 24265843
 
+# Vendeurs EN SOURDINE (lignes commentees plus bas) : moins de 10 cartes de la
+# wantlist en stock au 2026-08-13. Non scrapes par `fetch`. Decommenter pour
+# les reactiver ; leurs HTML deja presents dans data/sellers/ restent exploites
+# par `optimize` tant qu'ils ne sont pas supprimes.
 sellers:
   - AbsolutMintCard
   - Antredujeu
-  - ArcheAJeux
+  # - ArcheAJeux
+  - ARK-Games
   - BattleMindTavern
   - BazaarOfKoji
+  - bestmarmotte
   - Boutique-TCG
+  - BoxHorizons
   - bradpitkeeper
-  - CartesManiac
   - Cardaccess
   - CardsGGC
+  - Carfurle
   - Cartapapa-GP
+  - CartesManiac
   - CORP-F
   - cromwel
   - Dooz-TCG
-  - DracauGames
+  # - DracauGames
   - Eclypse
-  - edwyn-le-muet
+  # - edwyn-le-muet
   - Eldar-Caen
   - EUREKA-FR
   - FantasySphere
   - FMR-cards
-  - fredc
+  # - fredc
   - Garr0n
+  - Greg59
+  - HDC-Trade
   - hirochirak
   - InvestCollect
   - jace21
   - Jenbiwe
   - JuraGeekStore
   - Kavoldox
-  - LaBelleCarte
   - La-Guilde-Du-Jeu
+  - LaBelleCarte
+  # - Laurent38
+  - Le-royaume-de-Serra
   - ledouble6
+  - Lesjeuxdemerlin
   - LeVizz
   - LGRMasterC
   - Lud52
-  - Ludetopia
+  # - Ludetopia
+  - LudoB
+  - MaelstromCG
   - MagicAtHome
   - MagicBougnat
+  # - Magicboxx
   - MagicNice
   - MagicoSphere
-  - Magicboxx
   - maglaf88
+  - ManaMix
   - mattsagace
+  - meeples-et-cartes
   - MerfolkTraders
-  - MrJoShop
+  # - MrJoShop
   - MTGSPOT-FR
   - Mystic-Ambre
   - OJT50
   - OlympicMTG
+  - pandanstaface
   - Parence-com
   - Parkage
   - Philogelos
-  - PlaceOfGeek
+  # - PlaceOfGeek
+  # - play-mtg-fr
   - Playin
-  - play-mtg-fr
+  - plkfd
+  - Pyxidice
   - REDO-SHOP
   - RedScorpion
   - romainmtbtcg
   - Ruleofthegame
+  - sanjic
+  - Solmyr211
   - sortileges85
+  - Spellfactory
+  - SUPERCARTES
   - Table1MTG
+  - TacPlay
   - TCG-Detsuny
+  - TorinoMTG
   - Varzog
+  # - WoodMousePatronus
+  - Woops
   - yannzup
   - yardbirds
-  - Laurent38
-  - SUPERCARTES
-  - WoodMousePatronus
