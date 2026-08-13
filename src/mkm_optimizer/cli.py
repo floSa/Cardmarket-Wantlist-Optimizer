@@ -9,6 +9,7 @@ Commandes :
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -430,6 +431,157 @@ def check_cart(
 
     out_path = write_check_report(result, output_dir)
     console.print(f"\n[bold green]✓ Rapport[/bold green] : {out_path}")
+
+
+# ---- Commande : discover ----------------------------------------------------
+
+@app.command()
+def discover(
+    wantlist: Path = typer.Option(
+        ..., "--wantlist", "-w", exists=True, dir_okay=False, readable=True,
+        metavar="<file>", help="HTML de la page wantlist Cardmarket.",
+    ),
+    sellers_file: Path = typer.Option(
+        Path("data/vendeurs_liste/vendeurs.yaml"), "--sellers-file", "-f",
+        metavar="<file>",
+        help="YAML des vendeurs connus. Sert de référence, et de cible avec --write.",
+    ),
+    discovery_dir: Path = typer.Option(
+        Path("data/discovery"), "--discovery-dir", "-d",
+        help="Où stocker les fiches produit téléchargées.",
+    ),
+    min_cards: int = typer.Option(
+        10, "--min-cards",
+        help="Nb minimum de cartes de la wantlist que le vendeur doit proposer.",
+    ),
+    min_sales: int = typer.Option(
+        5000, "--min-sales",
+        help="Nb minimum de ventes réalisées par le vendeur (évite les petits vendeurs).",
+    ),
+    clicks: int = typer.Option(
+        2, "--clicks",
+        help="Clics sur « montrer plus de résultats » (50 offres de plus par clic).",
+    ),
+    skip_fetch: bool = typer.Option(
+        False, "--skip-fetch",
+        help="Ne re-télécharge rien, réagrège les fiches déjà présentes.",
+    ),
+    write: bool = typer.Option(
+        False, "--write",
+        help="Écrit les vendeurs retenus dans le YAML (fusion + tri alphabétique).",
+    ),
+    csv_out: Path = typer.Option(
+        Path("reports/vendeurs_decouverte.csv"), "--csv",
+        help="CSV de tous les vendeurs rencontrés.",
+    ),
+    no_csv: bool = typer.Option(False, "--no-csv", help="N'écrit pas le CSV."),
+    headless: bool = typer.Option(True, "--headless/--headed"),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """
+    Découvre des vendeurs à ajouter, à partir des fiches produit de la wantlist.
+
+    Part des cartes voulues (et non d'une liste de vendeurs) : ouvre la fiche de
+    chaque carte, relève qui la vend, et retient ceux qui dépassent les deux
+    seuils. Utilisable pour amorcer un `vendeurs.yaml` vide.
+    """
+    import csv as _csv
+
+    import yaml
+
+    from .scraper.discover import aggregate, fetch_product_pages, select
+
+    logging.basicConfig(
+        level=logging.DEBUG if verbose else logging.INFO,
+        format="%(levelname)-7s :: %(message)s",
+    )
+
+    wants = parse_wantlist(wantlist)
+    console.print(
+        f"[bold]→ Discover[/bold] {len(wants)} wants  seuils: ≥{min_cards} cartes "
+        f"et ≥{min_sales} ventes  clics={clicks}"
+    )
+
+    if not skip_fetch:
+        ok, ko = fetch_product_pages(wants, discovery_dir, clicks=clicks, headless=headless)
+        console.print(f"  fiches récupérées : {ok} ok, {ko} en échec")
+
+    found = aggregate(discovery_dir)
+    if not found:
+        console.print("[yellow]⚠ Aucune fiche produit exploitable.[/yellow]")
+        raise typer.Exit(1)
+
+    # `vendeurs.yaml` peut ne pas exister encore (amorçage depuis zéro).
+    known: set[str] = set()
+    wantlist_id: int | None = None
+    if sellers_file.exists():
+        cfg = yaml.safe_load(sellers_file.read_text(encoding="utf-8")) or {}
+        known = {s.strip() for s in (cfg.get("sellers") or []) if s and s.strip()}
+        wantlist_id = cfg.get("wantlist_id")
+
+    retenus = select(found, known, min_cards=min_cards, min_sales=min_sales)
+
+    if not no_csv:
+        csv_out.parent.mkdir(parents=True, exist_ok=True)
+        with csv_out.open("w", newline="", encoding="utf-8") as fh:
+            w = _csv.writer(fh, delimiter=";")
+            w.writerow(["vendeur", "ventes", "nb_cartes", "prix_median", "deja_dans_liste"])
+            for d in found:
+                w.writerow([
+                    d.seller, d.sales or "", d.n_cards,
+                    f"{d.median_price:.2f}" if d.median_price is not None else "",
+                    "oui" if d.seller in known else "non",
+                ])
+        console.print(f"  CSV complet : {csv_out}")
+
+    t = Table(title=f"Vendeurs à ajouter (≥{min_cards} cartes, ≥{min_sales} ventes)")
+    t.add_column("Vendeur", style="cyan")
+    t.add_column("Cartes", justify="right")
+    t.add_column("Ventes", justify="right")
+    t.add_column("Prix médian", justify="right")
+    for d in retenus:
+        t.add_row(d.seller, str(d.n_cards), str(d.sales or "?"),
+                  f"{d.median_price:.2f} €" if d.median_price is not None else "?")
+    console.print(t)
+    console.print(f"[bold]{len(retenus)}[/bold] vendeur(s) retenu(s) sur {len(found)} rencontré(s).")
+
+    if not write:
+        console.print("[dim]--write pour les ajouter à vendeurs.yaml[/dim]")
+        return
+    if not retenus:
+        console.print("[yellow]Rien à écrire.[/yellow]")
+        return
+
+    final = sorted(known | {d.seller for d in retenus}, key=str.casefold)
+    sellers_file.parent.mkdir(parents=True, exist_ok=True)
+
+    if sellers_file.exists():
+        # Réécriture conservatrice : on garde l'en-tête, les commentaires et les
+        # vendeurs mis en sourdine (lignes `# - Pseudo`), on ne touche qu'au bloc
+        # des vendeurs actifs.
+        lines = sellers_file.read_text(encoding="utf-8").splitlines()
+        i = next(n for n, l in enumerate(lines) if l.startswith("sellers:"))
+        entete = lines[:i + 1]
+        muets = [l for l in lines[i + 1:] if re.match(r"\s*#\s*-\s+\S", l)]
+        nouvelles = entete + [f"  - {s}" for s in final] + muets
+    else:
+        # Amorçage depuis zéro : `fetch` a besoin du wantlist_id, on le relit
+        # dans l'HTML de la wantlist plutôt que de produire un fichier inutilisable.
+        if wantlist_id is None:
+            m = re.search(r"/Wants/(\d+)", wantlist.read_text(encoding="utf-8"))
+            wantlist_id = int(m.group(1)) if m else None
+        nouvelles = ["# Liste des vendeurs Cardmarket à scraper.", ""]
+        if wantlist_id is not None:
+            nouvelles += [f"wantlist_id: {wantlist_id}", ""]
+        else:
+            nouvelles += ["# wantlist_id introuvable dans l'HTML — à renseigner à la main.",
+                          "wantlist_id:", ""]
+        nouvelles += ["sellers:"] + [f"  - {s}" for s in final]
+
+    sellers_file.write_text("\n".join(nouvelles) + "\n", encoding="utf-8")
+    console.print(
+        f"[bold green]✓[/bold green] {sellers_file} : {len(known)} → {len(final)} vendeurs actifs"
+    )
 
 
 if __name__ == "__main__":
