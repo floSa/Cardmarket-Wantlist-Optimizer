@@ -14,6 +14,7 @@ Pas de credentials en clair, jamais. C'est toi qui les tapes dans le navigateur.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import time
@@ -239,6 +240,65 @@ def _fallback_interactive(page, ctx, browser, storage_path: Path) -> None:
     print(f"\n✓ Session sauvegardée dans {storage_path}")
 
 
+def import_cookies_from_json(
+    json_path: Path = Path(".auth/cookies_export.json"),
+    storage_path: Path = STORAGE_STATE_PATH,
+) -> None:
+    """
+    Convertit un export JSON de cookies (provenant par exemple de Cookie-Editor)
+    au format Playwright storage_state.json.
+    """
+    if not json_path.exists():
+        raise FileNotFoundError(f"Fichier de cookies introuvable : {json_path}")
+
+    with open(json_path, "r", encoding="utf-8") as f:
+        raw_cookies = json.load(f)
+
+    if isinstance(raw_cookies, dict) and "cookies" in raw_cookies:
+        raw_cookies = raw_cookies["cookies"]
+
+    cf_names = {"cf_clearance", "__cf_bm", "_cfuvid", "__cflb"}
+    playwright_cookies = []
+
+    for c in raw_cookies:
+        name = c.get("name")
+        if not name or name in cf_names:
+            continue
+
+        same_site = c.get("sameSite", "Lax")
+        if same_site and isinstance(same_site, str):
+            if same_site.lower() in ("no_restriction", "none"):
+                same_site = "None"
+            elif same_site.lower() == "strict":
+                same_site = "Strict"
+            else:
+                same_site = "Lax"
+        else:
+            same_site = "Lax"
+
+        cookie_obj = {
+            "name": name,
+            "value": c.get("value", ""),
+            "domain": c.get("domain", ".cardmarket.com"),
+            "path": c.get("path", "/"),
+            "expires": c.get("expirationDate", -1),
+            "httpOnly": bool(c.get("httpOnly", False)),
+            "secure": bool(c.get("secure", False)),
+            "sameSite": same_site,
+        }
+        playwright_cookies.append(cookie_obj)
+
+    storage_path.parent.mkdir(parents=True, exist_ok=True)
+    storage_data = {
+        "cookies": playwright_cookies,
+        "origins": [],
+    }
+    with open(storage_path, "w", encoding="utf-8") as f:
+        json.dump(storage_data, f, indent=2)
+
+    print(f"\n[OK] {len(playwright_cookies)} cookies importés avec succès dans {storage_path}")
+
+
 # ---- Première connexion (interactive, headed) -------------------------------
 
 def interactive_login(storage_path: Path = STORAGE_STATE_PATH) -> None:
@@ -362,6 +422,19 @@ def is_session_valid(
         if last_err is not None:
             log.error("Probe session : %d tentatives échouées (%s)", retries, last_err)
             return False
+
+        # Si Cloudflare présente un défi JS / Turnstile, on attend qu'il se résolve
+        cf_markers = ("just a moment", "un instant", "veuillez patienter", "attention required", "checking your browser", "cloudflare")
+        for _ in range(10):
+            try:
+                title = (page.title() or "").lower()
+            except Exception:
+                title = ""
+            if any(m in title for m in cf_markers) or "cf_chl" in page.url:
+                log.info("Attente résolution Cloudflare (titre=%r, url=%s)...", title, page.url)
+                time.sleep(2)
+            else:
+                break
 
         final_url = page.url
         log.info("Session probe : URL finale = %s", final_url)

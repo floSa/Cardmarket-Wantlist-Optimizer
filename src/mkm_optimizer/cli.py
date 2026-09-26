@@ -9,9 +9,18 @@ Commandes :
 from __future__ import annotations
 
 import logging
+import os
 import re
+import sys
 from pathlib import Path
 from typing import Optional
+
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 import typer
 from rich.console import Console
@@ -52,6 +61,10 @@ def optimize(
         Path("config.yaml"), "--config", "-c", exists=True, readable=True,
         help="Fichier de configuration YAML.",
     ),
+    priorities_file: Optional[Path] = typer.Option(
+        None, "--priorities", "-p",
+        help="Fichier Markdown (.md) ou Excel (.xlsx) de priorisation (défaut : data/wantlist_priorities.md ou .xlsx).",
+    ),
     output_dir: Path = typer.Option(
         Path("reports"), "--output-dir", "-o",
         help="Dossier de sortie pour les rapports MD/CSV.",
@@ -76,6 +89,17 @@ def optimize(
     # Overrides locaux (wantlist_overrides.yaml à la racine du projet)
     overrides_path = Path("wantlist_overrides.yaml")
     wants = apply_wantlist_overrides(wants, overrides_path)
+
+    # Priorités (Markdown data/wantlist_priorities.md ou Excel data/wantlist_priorities.xlsx)
+    from .priorities import apply_priorities_to_wants
+
+    wants = apply_priorities_to_wants(wants, priorities_file)
+    custom_priorities = [w for w in wants if w.priority != 1.0]
+    if custom_priorities:
+        console.print(
+            f"  [cyan]Priorités appliquées[/cyan] : "
+            f"{len(custom_priorities)} carte(s) avec priorité personnalisée"
+        )
     # `filters.foil: any` neutralise la contrainte foil de TOUS les wants : on
     # cherche le prix le plus bas, foil ou non. La clé est portée par le want
     # (et non par l'offre), d'où la réécriture ici.
@@ -277,6 +301,29 @@ def login(
     _login(headless=headless)
 
 
+# ---- Commande : import-cookies ----------------------------------------------
+
+@app.command("import-cookies")
+def import_cookies_cmd(
+    cookies_file: Path = typer.Option(
+        Path(".auth/cookies_export.json"), "--cookies-file", "-f",
+        exists=True, dir_okay=False, readable=True,
+        help="Export JSON des cookies (ex: Cookie-Editor).",
+    ),
+    storage_path: Path = typer.Option(
+        Path(".auth/storage_state.json"), "--storage-path", "-s",
+        help="Chemin de sortie pour storage_state.json.",
+    ),
+) -> None:
+    """
+    Importe un export JSON de cookies du navigateur et génère storage_state.json.
+    Permet de contourner les blocages Cloudflare sur le formulaire de login.
+    """
+    from .scraper.auth import import_cookies_from_json
+
+    import_cookies_from_json(json_path=cookies_file, storage_path=storage_path)
+
+
 # ---- Commande : fetch -------------------------------------------------------
 
 @app.command()
@@ -391,6 +438,47 @@ def wantlist_csv(
         f"({len(wants)} wants / {sum(w.quantity for w in wants)} cartes) "
         f"→ {output}"
     )
+
+
+# ---- Commande : export-priorities (Markdown & Excel) -----------------------
+
+@app.command("export-priorities")
+def export_priorities_cmd(
+    wantlist: Path = typer.Option(
+        Path("data/wantlists/wantlists.html"), "--wantlist", "-w",
+        exists=True, dir_okay=False, readable=True,
+        help="HTML de la page wantlist Cardmarket.",
+    ),
+    output_md: Path = typer.Option(
+        Path("data/wantlist_priorities.md"), "--output-md",
+        help="Chemin du tableau Markdown (.md) à créer ou mettre à jour.",
+    ),
+    output_xlsx: Path = typer.Option(
+        Path("data/wantlist_priorities.xlsx"), "--output-xlsx",
+        help="Chemin du fichier Excel (.xlsx) à créer ou mettre à jour.",
+    ),
+) -> None:
+    """
+    Génère ou met à jour le tableau Markdown (.md) et le tableur Excel (.xlsx) pour noter et prioriser les cartes.
+    Préserve les priorités et commentaires déjà saisis si les fichiers existent déjà.
+    """
+    from .parser import parse_wantlist
+    from .parser.wantlist import parse_wantlist_meta
+    from .priorities import export_priorities_excel, export_priorities_markdown
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)-7s :: %(message)s")
+    wants = parse_wantlist(wantlist)
+    meta = parse_wantlist_meta(wantlist)
+
+    md_path = export_priorities_markdown(wants, output_md)
+    xlsx_path = export_priorities_excel(wants, output_xlsx)
+
+    console.print(
+        f"[bold green]✓[/bold green] Fichiers de priorités générés pour [bold]{meta.get('title')!r}[/bold] "
+        f"({len(wants)} cartes) :"
+    )
+    console.print(f"  • Tableau Markdown : [cyan]{md_path}[/cyan] (éditable directement)")
+    console.print(f"  • Tableur Excel    : [cyan]{xlsx_path}[/cyan] (éditable dans Excel/LibreOffice)")
 
 
 # ---- Commande : check-cart --------------------------------------------------

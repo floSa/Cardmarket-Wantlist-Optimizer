@@ -11,6 +11,7 @@ dependencies = [
     "rich>=13.0",           # CLI / logs lisibles
     "typer>=0.12",          # CLI ergonomique
     "python-dotenv>=1.0",   # chargement .env (credentials locaux gitignored)
+    "openpyxl>=3.1",        # gestion des fichiers Excel (.xlsx) pour la notation des priorités
 ]
 
 [project.optional-dependencies]

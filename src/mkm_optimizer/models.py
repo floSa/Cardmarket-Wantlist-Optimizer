@@ -61,6 +61,8 @@ class WantEntry:
     is_signed: Optional[bool] = None
     is_altered: Optional[bool] = None
     max_price: Optional[Decimal] = None                  # "Prix souhaité" — Decimal ou None
+    priority: float = 1.0                                # Coefficient de priorité (défaut: 1.0)
+    notes: Optional[str] = None                          # Commentaire optionnel utilisateur
 
     @property
     def is_metacard(self) -> bool:

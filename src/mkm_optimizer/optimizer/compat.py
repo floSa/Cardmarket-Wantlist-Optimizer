@@ -65,6 +65,7 @@ SET_ALIASES: dict[str, str] = {
     "edition-de-base-2020": "core-set-2020",
     "magic-2013": "magic-2013",
     "fondations": "foundations",
+    "la-renaissance-d-alara": "alara-reborn",
 }
 
 
@@ -72,9 +73,17 @@ SET_ALIASES: dict[str, str] = {
 
 def _sets_match(offer_set: str | None, want_set: str | None) -> bool:
     """
-    Comparaison robuste de set_codes. Les deux viennent normalement de l'URL
-    /Products/Singles/<set>/<card>, donc le même slug EN. On compare en
-    case-insensitive et après normalisation des tirets.
+    Comparaison robuste de set_codes.
+
+    Cas courant : les deux viennent de l'URL /Products/Singles/<set>/<card>,
+    donc le même slug EN — simple comparaison case-insensitive.
+
+    Cas dégradé : quand la ligne de wantlist pointe une URL « metacard »
+    (/Cards/<nom>), le set n'est nulle part dans l'URL et le parser retombe sur
+    le libellé affiché, donc en FRANÇAIS ("la-renaissance-d-alara") face au slug
+    EN de l'offre ("Alara-Reborn"). On repasse alors par `normalize_set`, qui
+    applique SET_ALIASES — c'est le point d'extension à enrichir quand un
+    nouveau set traduit apparaît.
     """
     if offer_set is None or want_set is None:
         return False
@@ -82,7 +91,10 @@ def _sets_match(offer_set: str | None, want_set: str | None) -> bool:
     def norm(s: str) -> str:
         return s.strip().lower().replace("_", "-")
 
-    return norm(offer_set) == norm(want_set)
+    if norm(offer_set) == norm(want_set):
+        return True
+
+    return normalize_set(offer_set) == normalize_set(want_set)
 
 
 def is_compatible(offer: Offer, want: WantEntry) -> bool:

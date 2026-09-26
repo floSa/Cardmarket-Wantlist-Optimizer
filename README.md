@@ -13,7 +13,9 @@
 Quatre étapes indépendantes, une par sous-commande, communiquant par fichiers
 sur disque (HTML bruts, rapports) :
 
-- `login` — session Playwright persistée dans `.auth/storage_state.json`
+- `import-cookies` — session Playwright reconstruite depuis un export de
+  cookies navigateur → `.auth/storage_state.json` (`login` reste dispo mais
+  Cloudflare le bloque)
 - `fetch` — scraping paginé des offres vendeurs → `data/sellers/<v>/page<N>.html`
 - `optimize` — parsing + compatibilité par want + solveur MIP exact (PuLP + CBC), un panier par scénario → `reports/`
 - `check-cart` — comparaison du panier construit sur MKM avec le rapport
@@ -166,7 +168,8 @@ uv run mkm-optim check-cart \
 ```text
 1. Sauvegarde ta wantlist MKM (page /Wants/<id>) avec l'extension SingleFile
    → data/wantlists/Wantlist.html
-2. Lance `mkm-optim login` (1 fois, ouvre Chromium pour la connexion)
+2. Exporte tes cookies MKM depuis ton navigateur → `.auth/cookies_export.json`,
+   puis `mkm-optim import-cookies` (cf. § Authentification)
 3. Lance `mkm-optim fetch --refresh` (scrape les vendeurs listés dans data/vendeurs_liste/vendeurs.yaml)
 4. Lance `mkm-optim optimize` (produit le rapport)
 5. Construis ton panier sur MKM, sauvegarde-le avec SingleFile
@@ -186,14 +189,35 @@ Cloudflare en tant qu'humain) :
 1. Connecte-toi sur cardmarket.com dans ton navigateur (Firefox/Chrome).
 2. Avec l'extension **Cookie-Editor**, exporte les cookies du domaine en JSON
    et colle-les dans `.auth/cookies_export.json` (gitignored).
-3. Convertis-les en session : on ne garde que les cookies d'authentification
-   (`PHPSESSID`, `idUser`, `cookie_settings`, `i18n_redirected` forcé à `fr`),
-   **pas** les cookies Cloudflare (`cf_clearance`, `__cf_bm`, `_cfuvid`) qui
-   sont liés à l'UA de ton navigateur — patchright regénère les siens. Le
-   résultat s'écrit dans `.auth/storage_state.json`.
+3. Convertis-les en session :
 
-> `mkm-optim login` (Chromium headed) reste dans le code pour le jour où
-> Cloudflare relâchera, mais n'est pas fiable actuellement.
+   ```bash
+   uv run mkm-optim import-cookies
+   ```
+
+   On ne garde que les cookies d'authentification (`PHPSESSID`, `idUser`,
+   `cookie_settings`, `i18n_redirected` forcé à `fr`), **pas** les cookies
+   Cloudflare (`cf_clearance`, `__cf_bm`, `_cfuvid`) qui sont liés à l'UA de ton
+   navigateur — patchright regénère les siens. Le résultat s'écrit dans
+   `.auth/storage_state.json`.
+
+> Le cookie `idUser` expire ~1 h après l'export : réimporte-le juste avant un
+> fetch. Si la probe de session échoue (« redirection vers /Login »), c'est
+> qu'il faut refaire l'export depuis le navigateur.
+
+> **Note WSL / Windows 11 (WSLg) :**
+> - Lorsque `mkm-optim login` est lancé depuis WSL vers l'affichage Windows (WSLg),
+>   Chromium utilise les options Wayland/Ozone (`--ozone-platform-hint=auto` et
+>   `--enable-features=UseOzonePlatform`) ainsi qu'une position forcée (`--window-position=100,100`).
+>   Sans ces flags, le serveur Xwayland de WSLg peut réduire ou décaler la fenêtre
+>   hors de l'écran visible tout en gardant une icône réduite dans la barre des tâches Windows
+>   (infobulle `WARN: copy mode [CON...` liée au bridge RDP de WSLg).
+> - Si Cloudflare affiche un CAPTCHA bloquant sur Chromium ou si la fenêtre WSLg
+>   ne répond pas sur votre système hôte, ouvrez simplement votre navigateur habituel
+>   (Chrome/Firefox sur Windows), connectez-vous sur cardmarket.com, exportez
+>   les cookies via Cookie-Editor dans `.auth/cookies_export.json` et lancez
+>   `uv run mkm-optim import-cookies`.
+
 
 ### `fetch` — récupération des offres vendeurs
 
@@ -355,8 +379,9 @@ mode interactif prend le relais.
 
 ### `RuntimeError: Session expirée ou invalide`
 
-MKM a invalidé la session côté serveur (timeout ou rotation). Relance
-`mkm-optim login`, puis ton `fetch`.
+MKM a invalidé la session côté serveur (timeout ou rotation), ou le cookie
+`idUser` a expiré. Réexporte tes cookies depuis le navigateur, relance
+`mkm-optim import-cookies`, puis ton `fetch`.
 
 ### `net::ERR_NETWORK_CHANGED`
 

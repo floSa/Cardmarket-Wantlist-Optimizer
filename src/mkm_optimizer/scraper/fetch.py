@@ -176,7 +176,16 @@ def fetch_seller(
                 return stats
 
             # Sauvegarde du HTML
-            html = page.content()
+            try:
+                html = page.content()
+            except (PWError, Exception) as e:
+                log.warning("[%s] Erreur lecture contenu page %d : %s — retry navigation", seller, site_idx, e)
+                response = _goto_with_backoff(page, current_url, opts)
+                if response is None:
+                    stats.error = "navigation_failed"
+                    return stats
+                html = page.content()
+
             out_path = seller_dir / f"page{site_idx}.html"
             out_path.write_text(html, encoding="utf-8")
             stats.pages_fetched += 1
@@ -347,10 +356,9 @@ def fetch_all_sellers(
         try:
             log.info("Validation de la session...")
             if not is_session_valid(ctx):
-                raise RuntimeError(
-                    "Session expirée ou invalide. Relance `mkm-optim login`."
-                )
-            log.info("Session OK — début du scraping (%d vendeurs)", len(sellers))
+                log.warning("Probe de session ambiguë (possible défi Cloudflare), poursuite avec le premier vendeur...")
+            else:
+                log.info("Session OK — début du scraping (%d vendeurs)", len(sellers))
 
             for i, seller in enumerate(sellers, start=1):
                 log.info("[%d/%d] %s", i, len(sellers), seller)

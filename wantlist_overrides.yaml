@@ -22,6 +22,9 @@ overrides:
   - card: "Éthérien doué"
     max_price: 0.75
 
+  - card: "Ancêtre gargaroth"
+    max_price: 4.50
+
   # Ces 3 wants ont été saisis sur MKM sans critère de langue : le solveur
   # partait donc chercher l'italien, moins cher. On force fr/en ici.
   - card: "Reboisement des régions reculées"

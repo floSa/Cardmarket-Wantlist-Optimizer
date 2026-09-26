@@ -84,6 +84,10 @@ optimization:
     - { name: "max_5_vendeurs", max_vendors: 5 }
     - { name: "max_6_vendeurs", max_vendors: 6 }
     - { name: "max_7_vendeurs", max_vendors: 7 }
+    - { name: "max_8_vendeurs", max_vendors: 8 }
+    - { name: "max_9_vendeurs", max_vendors: 9 }
+    - { name: "max_10_vendeurs", max_vendors: 10 }
+    - { name: "max_11_vendeurs", max_vendors: 11 }
     - { name: "min_prix_min_vendeurs", max_vendors: null, vendor_fixed_cost: 10 }
 
 # Cache des offres scrapées (durée de validité)

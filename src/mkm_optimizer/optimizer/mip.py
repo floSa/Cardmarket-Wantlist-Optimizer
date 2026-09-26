@@ -209,7 +209,10 @@ def solve(
         for v in sellers
         for k in range(len(brackets))
     )
-    slack_cost = pulp.lpSum(u[wi] * float(unmet_penalty) for wi in range(len(wants)))
+    slack_cost = pulp.lpSum(
+        u[wi] * float(unmet_penalty * Decimal(str(wants[wi].priority)))
+        for wi in range(len(wants))
+    )
     # Coût fixe par vendeur sélectionné : pénalise les vendeurs marginaux
     vendor_cost = pulp.lpSum(x[v] * float(vendor_fixed_cost) for v in sellers)
     prob += cards_cost + shipping_cost + slack_cost + vendor_cost

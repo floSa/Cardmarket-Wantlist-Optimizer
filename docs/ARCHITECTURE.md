@@ -35,7 +35,7 @@ Tout le code vit sous [src/mkm_optimizer/](../src/mkm_optimizer).
 | [cart_checker.py](../src/mkm_optimizer/cart_checker.py) | Compare un panier MKM (HTML SingleFile) au rapport d'un scénario. |
 | [parser/wantlist.py](../src/mkm_optimizer/parser/wantlist.py) | Parse la page `/Wants/<id>` → `list[WantEntry]` + métadonnées. |
 | [parser/seller_offers.py](../src/mkm_optimizer/parser/seller_offers.py) | Parse les pages `/Users/<v>/Offers` + pagination → `list[Offer]`. |
-| [scraper/auth.py](../src/mkm_optimizer/scraper/auth.py) | Login Playwright, persistance de session dans `.auth/storage_state.json`. |
+| [scraper/auth.py](../src/mkm_optimizer/scraper/auth.py) | Session Cardmarket : `import_cookies()` (export navigateur → `storage_state`), login Playwright (bloqué par Cloudflare), probe de validité. |
 | [scraper/fetch.py](../src/mkm_optimizer/scraper/fetch.py) | Récupération paginée des offres, rate limit, backoff, resume. |
 | [optimizer/compat.py](../src/mkm_optimizer/optimizer/compat.py) | `is_compatible(offer, want)` : contraintes dures (nom, set, état, langue, foil, signed, altered). |
 | [optimizer/mip.py](../src/mkm_optimizer/optimizer/mip.py) | Solveur exact PuLP + CBC : `solve(...)` → `Solution`. |
@@ -64,9 +64,12 @@ Versions lues dans [pyproject.toml](../pyproject.toml).
 
 ## 4. Flux de bout en bout
 
-1. `login` — ouvre Chromium (headed par défaut, WSLg sur Windows 11), pré-remplit
-   le formulaire MKM si `.env` est présent, persiste la session dans
-   `.auth/storage_state.json` (valide ~30 jours).
+1. `import-cookies` — convertit l'export Cookie-Editor `.auth/cookies_export.json`
+   en `.auth/storage_state.json` : seuls les cookies d'auth (`PHPSESSID`,
+   `idUser`, `cookie_settings`, `i18n_redirected` forcé à `fr`) sont repris, les
+   cookies Cloudflare étant liés au fingerprint du navigateur source.
+   (`login`, qui ouvre Chromium et soumet le formulaire, reste dans le code mais
+   Cloudflare le bloque depuis mi-2026.)
 2. `fetch` — pour chaque vendeur de `data/vendeurs_liste/vendeurs.yaml`, navigue
    sur `/Users/<v>/Offers/Singles?idWantslist=<id>` (filtre natif MKM), suit la
    pagination, sauvegarde chaque page dans `data/sellers/<pseudo>/page<N>.html`.
@@ -87,7 +90,8 @@ flowchart TD
     sy[vendeurs.yaml]
   end
   subgraph Scraping
-    login[login Playwright] --> sess[.auth/storage_state.json]
+    ck[cookies_export.json] --> imp[import-cookies]
+    imp --> sess[.auth/storage_state.json]
     fetch[fetch] --> html[data/sellers/&lt;v&gt;/page&lt;N&gt;.html]
     sess --> fetch
     sy --> fetch

@@ -63,8 +63,10 @@ gère trois choses que le Shopping Wizard natif de Cardmarket traite mal :
   hypothèse caduque → heuristique nécessaire.
 - **Variantes d'art interchangeables** : les suffixes MKM `(V.1)`, `(V.2)` sont
   ignorés (même carte Magic). Faux si l'utilisateur veut une variante précise.
-- **Session valide ~30 jours** : le `storage_state` Playwright reste exploitable
-  sans re-login fréquent.
+- **Session courte** : hypothèse initiale d'un `storage_state` valide ~30 jours,
+  démentie à l'usage — le cookie `idUser` importé expire en ~1 h. En pratique on
+  réexporte les cookies du navigateur juste avant chaque campagne de `fetch`
+  (`import-cookies`). Un fetch complet (~70 vendeurs) tient dans cette fenêtre.
 
 ---
 
