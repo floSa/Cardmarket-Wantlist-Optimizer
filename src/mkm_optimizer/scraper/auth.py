@@ -243,6 +243,7 @@ def _fallback_interactive(page, ctx, browser, storage_path: Path) -> None:
 def import_cookies_from_json(
     json_path: Path = Path(".auth/cookies_export.json"),
     storage_path: Path = STORAGE_STATE_PATH,
+    keep_cf: bool = False,
 ) -> None:
     """
     Convertit un export JSON de cookies (provenant par exemple de Cookie-Editor)
@@ -262,7 +263,7 @@ def import_cookies_from_json(
 
     for c in raw_cookies:
         name = c.get("name")
-        if not name or name in cf_names:
+        if not name or (name in cf_names and not keep_cf):
             continue
 
         same_site = c.get("sameSite", "Lax")
@@ -358,13 +359,21 @@ def get_authenticated_context(
     playwright: Playwright,
     headless: bool = True,
     storage_path: Path = STORAGE_STATE_PATH,
+    cdp_url: str | None = None,
 ) -> tuple[object, BrowserContext]:
     """
     Lance un navigateur Chromium en réutilisant le storage_state existant.
     Retourne (browser, context). À l'appelant de les fermer.
 
+    Si `cdp_url` est fourni, on se branche à la place sur le vrai navigateur de
+    l'utilisateur (Chrome lancé avec --remote-debugging-port) : session,
+    cookies Cloudflare et empreinte sont ceux de ce navigateur.
+
     Lève RuntimeError si pas de session enregistrée.
     """
+    if cdp_url:
+        browser = playwright.chromium.connect_over_cdp(cdp_url)
+        return browser, browser.contexts[0]
     if not storage_path.exists():
         raise RuntimeError(
             f"Pas de session enregistrée ({storage_path}). "

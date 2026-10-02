@@ -314,6 +314,10 @@ def import_cookies_cmd(
         Path(".auth/storage_state.json"), "--storage-path", "-s",
         help="Chemin de sortie pour storage_state.json.",
     ),
+    keep_cf: bool = typer.Option(
+        False, "--keep-cf",
+        help="Conserve les cookies Cloudflare (cf_clearance, __cf_bm, _cfuvid…).",
+    ),
 ) -> None:
     """
     Importe un export JSON de cookies du navigateur et génère storage_state.json.
@@ -321,7 +325,9 @@ def import_cookies_cmd(
     """
     from .scraper.auth import import_cookies_from_json
 
-    import_cookies_from_json(json_path=cookies_file, storage_path=storage_path)
+    import_cookies_from_json(
+        json_path=cookies_file, storage_path=storage_path, keep_cf=keep_cf
+    )
 
 
 # ---- Commande : fetch -------------------------------------------------------
@@ -344,6 +350,11 @@ def fetch(
     headless: bool = typer.Option(
         True, "--headless/--headed",
         help="Mode headless (par défaut) ou headed (pour debug visuel).",
+    ),
+    cdp_url: Optional[str] = typer.Option(
+        None, "--cdp-url",
+        help="Se brancher au vrai Chrome de l'utilisateur (ex: http://localhost:9222), "
+             "lancé avec --remote-debugging-port, au lieu d'un navigateur automatisé.",
     ),
     min_delay: int = typer.Option(800, "--min-delay-ms"),
     max_delay: int = typer.Option(1500, "--max-delay-ms"),
@@ -386,7 +397,7 @@ def fetch(
         max_delay_ms=max_delay,
         refresh=refresh,
     )
-    stats = fetch_all_sellers(sellers, opts, headless=headless)
+    stats = fetch_all_sellers(sellers, opts, headless=headless, cdp_url=cdp_url)
 
     # Récap
     t = Table(title="Récap fetch", show_lines=False)

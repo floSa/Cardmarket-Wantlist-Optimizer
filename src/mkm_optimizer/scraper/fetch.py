@@ -365,6 +365,7 @@ def fetch_all_sellers(
     sellers: Iterable[str],
     opts: FetchOptions,
     headless: bool = True,
+    cdp_url: str | None = None,
 ) -> list[FetchStats]:
     """
     Boucle sur la liste de vendeurs, fetch séquentiel.
@@ -379,7 +380,7 @@ def fetch_all_sellers(
 
     results: list[FetchStats] = []
     with sync_playwright() as p:
-        browser, ctx = get_authenticated_context(p, headless=headless)
+        browser, ctx = get_authenticated_context(p, headless=headless, cdp_url=cdp_url)
         try:
             log.info("Validation de la session...")
             if not is_session_valid(ctx):
