@@ -1,5 +1,7 @@
-# Auth / secrets
-.auth/
+# Auth / secrets (le dossier est conservé via .gitkeep + l'exemple, jamais le contenu réel)
+.auth/*
+!.auth/.gitkeep
+!.auth/cookies_export.example.json
 credentials.json
 config.local.yaml
 .env
