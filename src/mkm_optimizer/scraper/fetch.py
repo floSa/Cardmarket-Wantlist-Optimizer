@@ -21,8 +21,10 @@ from __future__ import annotations
 import logging
 import random
 import re
+import shutil
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Callable, Iterable
 
@@ -106,7 +108,9 @@ def fetch_seller(
     )
 
     # --- Politique de cache --------------------------------------------------
-    # 1) --refresh : on efface l'existant et on repart à la page 1.
+    # 1) --refresh : on re-télécharge dans un dossier de staging et on ne
+    #    remplace l'existant qu'en cas de succès complet (un échec CF/réseau
+    #    laisse donc l'ancien instantané intact, daté par fetched_at.txt).
     # 2) Pas de --refresh, pas de pages en cache : nouveau vendeur, page 1.
     # 3) Pas de --refresh, des pages en cache :
     #      - Si on a déjà page1.html, on lit la pagination dedans pour
@@ -114,10 +118,11 @@ def fetch_seller(
     #      - Si on a toutes les pages → skip total (rien à faire).
     #      - Sinon → on RESUME à la 1re page manquante.
     start_idx = 1
-    if opts.refresh and seller_dir.exists():
-        for f in seller_dir.glob("page*.html"):
-            f.unlink()
-            log.debug("[%s] supprimé %s (refresh)", seller, f.name)
+    final_dir = seller_dir
+    if opts.refresh:
+        seller_dir = opts.output_dir.parent / "_staging" / seller
+        if seller_dir.exists():
+            shutil.rmtree(seller_dir)
     elif seller_dir.exists():
         existing_pages = _existing_page_nums(seller_dir)
         if existing_pages:
@@ -212,6 +217,10 @@ def fetch_seller(
             site_idx += 1
             sleep_fn()
 
+        if opts.refresh and stats.pages_fetched > 0:
+            _commit_staging(seller_dir, final_dir)
+        elif stats.pages_fetched > 0:
+            _stamp(final_dir)
         if opts.progress_cb:
             opts.progress_cb(stats)
         return stats
@@ -222,6 +231,24 @@ def fetch_seller(
         except Exception:
             pass
         stats.duration_seconds = round(time.monotonic() - started, 2)
+
+
+def _stamp(seller_dir: Path) -> None:
+    """Date de l'instantané vendeur (heure locale, ISO)."""
+    (seller_dir / "fetched_at.txt").write_text(
+        datetime.now().astimezone().isoformat(timespec="seconds") + "\n", encoding="utf-8"
+    )
+
+
+def _commit_staging(staging: Path, final_dir: Path) -> None:
+    """Remplace l'ancien instantané par le nouveau, une fois celui-ci complet."""
+    final_dir.mkdir(parents=True, exist_ok=True)
+    for f in final_dir.glob("page*.html"):
+        f.unlink()
+    for f in staging.glob("page*.html"):
+        shutil.move(str(f), final_dir / f.name)
+    _stamp(final_dir)
+    shutil.rmtree(staging, ignore_errors=True)
 
 
 _CF_CHALLENGE_MARKERS = (
@@ -366,6 +393,11 @@ def fetch_all_sellers(
                 results.append(stats)
                 if stats.error == "auth_expired":
                     log.error("Session expirée en cours de scraping — abandon.")
+                    break
+                # Cloudflare / réseau : inutile de s'acharner sur 80 vendeurs
+                recent = [r.error for r in results[-3:]]
+                if len(recent) == 3 and all(e == "navigation_failed" for e in recent):
+                    log.error("3 échecs de navigation consécutifs (défi Cloudflare ?) — abandon.")
                     break
                 # Pause entre vendeurs
                 if i < len(sellers):
